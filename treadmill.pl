@@ -98,7 +98,7 @@ my $exit_threads :shared = 0;
 # CTRL-C #
 ##########
 
-$SIG{'INT'} = \&abort;
+$SIG{'INT'} = \&Abort;
 
 
 ############
@@ -143,7 +143,7 @@ treadmill.pl [-H ldapuri] [-D binddn] [-w passwd] [--help]
              [--threads num] [--config file] [--profile file]
              [--duration seconds]
 
-* Single letter options mirror those of ldapsearch. 
+* Single letter options mirror those of ldapsearch.
 
 END
 
@@ -165,16 +165,16 @@ sub main {
 	my $dot_cnt; 
 	#TODO: Re-add required opt checking. 
 	
-	my %shell_opts = &GetShellOpts();
+	my %shell_opts = &Get_Shell_Opts();
 	&Hash_Overlay(\%options, \%shell_opts);
 	
-	&GetFileOpts(\%options, $options{conffile});	
+	&Get_File_Opts(\%options, $options{conffile});	
 	&Hash_Overlay(\%options, \%shell_opts);
 	
-	&GetProfile(\%options, $options{profile});
+	&Get_Profile(\%options, $options{profile});
 	&Hash_Overlay(\%options, \%shell_opts);
 
-	my @config_errs = &CheckOpts(
+	my @config_errs = &Check_Opts(
 								\%options, 
 								\@required_opts);
 
@@ -185,7 +185,7 @@ sub main {
 
 	my ($i, $tmp_thr);
 	for ($i = 0; $i < $options{threads}; $i++ ) {
-		$tmp_thr = threads->create('start_thread', \%options);
+		$tmp_thr = threads->create('Start_Thread', \%options);
 	}
 
 	print "Starting treadmill.\n";
@@ -226,7 +226,7 @@ sub main {
 # Thread related code #
 #######################
 
-sub start_thread {
+sub Start_Thread {
 	my %args = %{+shift};
 	
 	my ($ldap, $err_msg) = LDAP_Connect($args{URI}, $args{binddn}, $args{pass});
@@ -243,12 +243,12 @@ sub start_thread {
 			$fun_ret = $fun_refs->[$i]->($ldap, @{$arg_refs->[$i]});
 
 			if ($fun_ret) {
-				$cleanup_ret = &cleanup($ldap, \%args, $dns_ref);
+				$cleanup_ret = &Cleanup($ldap, \%args, $dns_ref);
 				
 				return (LDAP_Fail_Msg($fun_ret), LDAP_Fail_Msg($cleanup_ret)) if ($cleanup_ret);
 				return LDAP_Fail_Msg($fun_ret);
 			} elsif ($exit_threads) {
-				$cleanup_ret = &cleanup($ldap, \%args, $dns_ref);
+				$cleanup_ret = &Cleanup($ldap, \%args, $dns_ref);
 				
 				return LDAP_Fail_Msg($cleanup_ret) if ($cleanup_ret);
 				return 0;
@@ -289,7 +289,7 @@ sub Join_Threads {
 }
 
 
-sub abort {
+sub Abort {
 	print "\nCaught CTRL-C. Performing Cleanup.\n";
 	$exit_threads = 1;
 }
@@ -299,7 +299,7 @@ sub abort {
 # Functions #
 #############
 
-sub GetShellOpts {
+sub Get_Shell_Opts {
 	my %shell_opts;
 	my $needs_help;
 
@@ -324,7 +324,7 @@ sub GetShellOpts {
 }
 
 
-sub GetFileOpts {
+sub Get_File_Opts {
 	my $opts_ref = shift;
 	my $file = shift;	
 
@@ -352,12 +352,12 @@ sub GetFileOpts {
 }
 
 
-sub GetProfile {
-	&GetFileOpts(@_);
+sub Get_Profile {
+	&Get_File_Opts(@_);
 }
 
 
-sub CheckOpts {
+sub Check_Opts {
 	my %settings = %{+shift};
 	my @reqs = @{+shift};
 	my @errs;
@@ -374,14 +374,14 @@ sub CheckOpts {
 	}
 	
 	for my $item (@reqs) {
-		die($usage) unless (exists($settings{$item}));
+		push (@errs, "Missing required option: $item \n") unless (exists($settings{$item}));
 	}
 	
 	return @errs;
 }
 
 
-sub cleanup {
+sub Cleanup {
 	my $ldap = shift;
 	my %settings = %{+shift};
 	my @dns = @{+shift};
