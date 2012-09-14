@@ -30,7 +30,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # 
 # -----------------------------------------------------------------------
-package LDAP;
+package Treadmill::LDAP;
 
 use strict;
 use warnings;
