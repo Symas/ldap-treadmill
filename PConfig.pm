@@ -30,107 +30,66 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # 
 # -----------------------------------------------------------------------
-package Testers;
+package PConfig;
 
 use strict;
 use warnings;
 
-use Net::LDAP;
-
+use Safe;
 
 require Exporter;
 
-our $VERSION	= 0.1;
+our $VERSION	= .1;
 our @ISA		= qw( Exporter );
 
-our @EXPORT_OK	= qw( Binder Searcher Adder Modifier Deleter );
+our @EXPORT_OK	 = qw( Load_Config );
+our %EXPORT_TAGS = (
+					CONST => [qw( CONFIG_SUCCESS CONFIG_ERR_NOEXIST 
+					              CONFIG_ERR_NOREAD CONFIG_ERR_PARSE 
+					              CONFIG_ERR_NOTFILE )],
+					);
+
+Exporter::export_ok_tags('CONST');
 
 
+=head1 Load_Config
 
-#############
-# Functions #
-#############
-
-=head1 Binder
- Purpose: Unbinds and re-binds inside an ldap session
- Accepts: LDAP Connection, Bind DN, Bind Pass
- Returns: A Net::LDAP::Message code. ( 0 for success )
-
+Purpose: To load a perl format configuration file.
+Accepts: File name
+Returns: 
+	* A hash datastructure on success.
+	* undef and an error code on failure. 
 =cut
 
-sub Binder {
-	my ($ldap, $dn, $pw) =  @_;
+use constant CONFIG_SUCCESS		=> 0;
 
-	#print "Binding as: \"$dn\" \"$pw\"";
+use constant CONFIG_ERR_NOEXIST	=> 1;
+use constant CONFIG_ERR_NOREAD	=> 2;
+use constant CONFIG_ERR_PARSE	=> 3;
+use constant CONFIG_ERR_NOTFILE	=> 4;
+
+our %Options;
+
+sub Load_Config {
+	my $file = shift;
+
+	return undef, CONFIG_ERR_NOEXIST	unless (-e $file);
+	return undef, CONFIG_ERR_NOREAD		unless (-r $file);
+	return undef, CONFIG_ERR_NOTFILE	unless (-f $file || -l $file);
+
+	my $compartment = new Safe;
+	$compartment->share('%Options');
+	# For an opcode/description table see "perl -MOpcode=opdump -e opdump"
+	$compartment->permit_only(qw( padany refgen :base_core :base_mem :base_math ));
+	my $result = $compartment->rdo($file,1);
+
+	if ($@) {
+		print "err!!!";
+		print "\n $@\n"; #TODO: remove
+		return undef, CONFIG_ERR_PARSE;
+	};
 	
-	my $msg = $ldap->bind( $dn, password => $pw );
-	return $msg->code();
-}
-
-
-=head1 Searcher
- Purpose: Runs a search on an ldap server
- Accepts: LDAP Connection, Filter String
- Returns: A Net::LDAP::Message code. ( 0 for success )
-
-=cut
-
-sub Searcher {
-	my ($ldap,$base, $filter) = @_;
-
-	my $search = $ldap->search( base => $base, filter => $filter );
-
-	#print "Searched for: $filter\t\t" . $search->count() . "\n";	
-
-	return $search->code;
-}
-
-
-=head1 Adder
- Purpose: Add some data to LDAP
- Accepts: LDAP Connection, DN, Attr hash ref. 
- Returns: A Net::LDAP::Message code. ( 0 for success )
-
-=cut
-
-sub Adder {
-	my ( $ldap, $dn, $attr_ref ) = @_;
-	
-	#print "Adding: $dn\n";
-	
-	my $msg = $ldap->add( $dn, %{$attr_ref} );	
-	return $msg->code();
-}
-
-
-=head1 Modifier
- Purpose: Replace the contents of a LDAP attribute.
- Accepts: LDAP Connection, DN, a hash of new data. 
-
-=cut
-
-sub Modifier {
-	my ( $ldap, $dn, $attr_ref ) = @_;
-
-	#TODO: add more operation types. See perldoc for modify...
-	my $mesg = $ldap->modify($dn, replace => $attr_ref);
-	return $mesg->code();
-}
-
-
-=head1 Deleter
- Purpose: Delete an entry
- Accepts: LDAP Connection, DN
- Returns: Returns: A Net::LDAP::Message code. ( 0 for success )
-
-=cut
-
-sub Deleter {
-	my ($ldap, $dn) = @_;
-
-	#print "Deleting: $dn\n";
-	my $mesg = $ldap->delete($dn);
-	return $mesg->code();
+	return \%Options, undef;
 }
 
 1;

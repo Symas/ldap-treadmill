@@ -1,0 +1,72 @@
+# -----------------------------------------------------------------------
+#                        SYMAS OPEN SOURCE LICENSE
+# 
+# Copyright (c) 2008, 2009, 2010, 2011, 2012 Symas Corporation
+# 
+# All rights reserved.
+# 
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+# 
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in
+#      the documentation and/or other materials provided with the
+#      distribution.
+#    * Neither the name of the Symas Corporation nor the names of its
+#      contributors may be used to endorse or promote products derived
+#      from this software without specific prior written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# 
+# -----------------------------------------------------------------------
+
+
+##################################
+#                                #
+# Symas Treadmill sample profile #
+#                                #
+##################################
+
+# Configuration Notes:
+# * The code in this file is run in a limited environment. Functions like 
+#   'eval', 'exit', and 'exec' aren't permitted. 
+# * The order of precedence for treadmill settings from least to final is:
+#   defaults -> treadmill.conf -> profile -> command line.
+
+
+# Here you speficy the number of each operation type to run per thread per iteration.
+# Each thread will generate a randomized list of these operations and cycle through it 
+# until an exit condition occurs.
+#
+# Note: 
+# * Each add will cause a coresponding delete(or two, see next line). 
+# * A cleanup is done when an exit condition occurs. This results in a delete operation
+#   for each add. Currently, this is done for all generated DNs reguardless of if they've 
+#   already been deleted that iteration. I'm planning to change this in the future. 
+#
+
+my %profile = (
+	bind	=> 20,
+);
+
+
+# Here is a chance to override options from the config file but not the command line.
+# 'duration' and 'threads' are likely to be of the greatest interest. 
+my %extra_options = (
+	threads		=> 4,
+	duration	=> 0,
+);
+
+# Do not edit this line.
+%Options = (%extra_options, op_profile => \%profile);
