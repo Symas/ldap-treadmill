@@ -32,22 +32,30 @@
 # 
 # -----------------------------------------------------------------------
 
-#TODO: See below
-# - library checks
-
 use strict;
 use warnings;
 
 # Required for threads
-use 5.10.0;
+use 5.8.0;
 
 #NOTE: Load these two early as possible and in this order.
 use threads qw( yield );
 use threads::shared;
 
+
+
+
+###########
+# Modules #
+###########
+
+# NOTE: Thread modules loaded at top of file. 
+
 use Net::LDAP;
 use Net::LDAP::Constant qw( LDAP_NO_SUCH_OBJECT );
 use Getopt::Long;
+
+
 
 use LDAP	qw( LDAP_Connect LDAP_Close LDAP_Fail_Msg );
 use PConfig	qw( Load_Config :CONST);
@@ -137,7 +145,7 @@ my @required_opts = qw( URI basedn threads randchars op_profile );
 my $usage = <<END;
 
 treadmill.pl [-H ldapuri] [-D binddn] [-w passwd] [--help]
-             [--threads num] [--conf file] [--profile file]
+             [--threads num] [--config file] [--profile file]
              [--duration seconds]
 
 * Single letter options mirror those of ldapsearch. 
@@ -159,17 +167,17 @@ END
 sub main {
 	my $thr_cnt;
 	my $thr_msg_ref;
-	my $dotcnt; 
+	my $dot_cnt; 
 	#TODO: Re-add required opt checking. 
 	
-	# NOTE: GetShellOpts is called first in case default config/profile
-	# locations are set on the command and second to give command line opts
-	# precedence. Very Kludgy. :-/
-	&GetShellOpts(\%options);
-	&GetFileOpts(\%options, $options{conffile});
+	my %shell_opts = &GetShellOpts();
+	&Hash_Overlay(\%options, \%shell_opts);
+	
+	&GetFileOpts(\%options, $options{conffile});	
+	&Hash_Overlay(\%options, \%shell_opts);
+	
 	&GetProfile(\%options, $options{profile});
-	&GetShellOpts(\%options);
-
+	&Hash_Overlay(\%options, \%shell_opts);
 
 	my @config_errs = &CheckOpts(
 								\%options, 
@@ -180,7 +188,6 @@ sub main {
 		exit(1);
 	}
 
-	# Set up our threads
 	my ($i, $tmp_thr);
 	for ($i = 0; $i < $options{threads}; $i++ ) {
 		$tmp_thr = threads->create('start_thread', \%options);
@@ -197,7 +204,7 @@ sub main {
 		}
 
 		print '.' unless ($exit_threads);
-		print "\n" unless (++$dotcnt % 60);
+		print "\n" unless (++$dot_cnt % 60);
 
 		($thr_cnt, $thr_msg_ref) = &Check_Threads();	
 		last if (scalar(@{$thr_msg_ref}) || !$thr_cnt);
@@ -298,29 +305,33 @@ sub abort {
 #############
 
 sub GetShellOpts {
-	my %defaults = %{+shift};
-	
+	my %shell_opts;
 	my $needs_help;
 
 	GetOptions(
-		'H=s'			=> \$defaults{URI},
-		'D=s'			=> \$defaults{binddn},
-		'w=s'			=> \$defaults{pass},
-		'threads=i'		=> \$defaults{threads},
-		'conf=s'		=> \$defaults{conffile},
-		'profile=s'		=> \$defaults{profile},
-		'duration=i'	=> \$defaults{duration},
+		'H=s'			=> \$shell_opts{URI},
+		'D=s'			=> \$shell_opts{binddn},
+		'w=s'			=> \$shell_opts{pass},
+		'threads=i'		=> \$shell_opts{threads},
+		'config=s'		=> \$shell_opts{conffile},
+		'profile=s'		=> \$shell_opts{profile},
+		'duration=i'	=> \$shell_opts{duration},
 		'help|?'		=> \$needs_help,
 		) or die ($usage);
 
 	die($usage) if ($needs_help);
-
+	
+	#for (keys %shell_opts) {
+	#	$opt_ref->{$_} = $shell_opts{$_};	
+	#}
+	
+	return %shell_opts;
 }
 
 
 sub GetFileOpts {
-	my %settings = %{+shift};
-	my $file = shift;
+	my $opts_ref = shift;
+	my $file = shift;	
 
 	my ($config_ref, $err) = Load_Config($file);
 
@@ -339,8 +350,9 @@ sub GetFileOpts {
 		return;
 	}
 
-	# Merge config options over defaults. 
-	@settings{keys(%{$config_ref})} = values(%{$config_ref});
+	for (keys %{$config_ref}) {
+		$opts_ref->{$_} = $config_ref->{$_}
+	}
 
 }
 
@@ -395,7 +407,7 @@ sub Populate_Funs {
 	my %fun_types	= %{+shift};
 	my %settings	= %{+shift};
 
-	#TODO: Make these two configurable. 
+	# TODO: Make these two configurable. 
 	my $dn_attr		= 'cn';
 	my @obj_class	= qw( top organizationalPerson );
 	my @attr_list	= qw( cn sn title ou );
@@ -524,6 +536,18 @@ sub Populate_Funs {
 	}
 
 	return \@all_ops, \@all_args, \@dn_list;
+}
+
+sub Hash_Overlay {
+	my $src_ref = shift;
+	my $overlay_ref = shift;
+
+	my ($key, $value);
+	while (($key, $value) = each %{$overlay_ref}) {
+		next unless(defined($value));
+		$src_ref->{$key} = $overlay_ref->{$key};
+	}
+
 }
 
 

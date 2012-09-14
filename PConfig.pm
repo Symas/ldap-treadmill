@@ -79,13 +79,14 @@ sub Load_Config {
 
 	my $compartment = new Safe;
 	$compartment->share('%Options');
-	# For an opcode/description table see "perl -MOpcode=opdump -e opdump"
 	$compartment->permit_only(qw( padany refgen :base_core :base_mem :base_math ));
 	my $result = $compartment->rdo($file,1);
 
 	if ($@) {
-		print "err!!!";
-		print "\n $@\n"; #TODO: remove
+		# For an opcode/description table see `perl -MOpcode=opdump -e opdump`
+		# You can use the error information in $@ to match a description to a code 
+		# and add it above.
+		# print "\n $@\n";
 		return undef, CONFIG_ERR_PARSE;
 	};
 	

@@ -64,8 +64,8 @@ my %profile = (
 # Here is a chance to override options from the config file but not the command line.
 # 'duration' and 'threads' are likely to be of the greatest interest. 
 my %extra_options = (
-	threads		=> 4,
-	duration	=> 0,
+	threads		=> 3,
+	duration	=> 30,
 );
 
 # Do not edit this line.
