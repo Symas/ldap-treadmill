@@ -302,6 +302,8 @@ sub Abort {
 sub Get_Shell_Opts {
 	my %shell_opts;
 	my $needs_help;
+	
+	Getopt::Long::Configure( qw( no_auto_abbrev no_ignore_case ) );
 
 	GetOptions(
 		'H=s'			=> \$shell_opts{URI},
