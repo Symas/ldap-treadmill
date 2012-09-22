@@ -1,0 +1,67 @@
+=head1 NAME
+
+treadmill.pl - A LDAP server exercise machine
+
+=head1 SYNOPSIS
+
+treadmill.pl [-H ldapuri] [-D binddn] [-w passwd] [--help]
+             [--threads num] [--config file] [--profile file]
+             [--smartgen ][-f file]
+             [--duration seconds]
+  
+ * Single letter options mirror those of ldapsearch.
+
+=head1 DESCRIPTION
+
+ The LDAP Treadmill is a simple perl application that will run a defined set of 
+ operations on a server for a interval or pending CTRL-C. 
+ 
+ One may also: 
+  - Specify multiple threads. One connection per thread.
+  - Specify additional operation sets and coresponding settings as profiles
+  - Automatically generate more pertinent operation parameters by examining the 
+    server or parsing an LDIF backup.
+
+=head1 OPTIONS
+
+ -H ldapuri The LDAP server URI to connect to.
+
+ -D binddn The DN used for server authentication.
+
+ -w passwd The password used for server authentication.
+
+ --help Print out a brief usage statement.
+
+ --threads num The number of threads to launch. Each thread generates a
+   somewhat randomized set of operations which it loops until interrupted.
+
+ --config file Allows one to specify an alternate configuration file.
+
+ --profile file Allows one to specify an alternate profile file.
+
+ --smartgen Instructs treadmill to connect to LDAP and read a subset of entries 
+   used to accumulate some statistics and information for more relevant operation 
+   generation. 
+
+   If -f is used an LDIF file may be substituted which is usually faster.
+ 
+ -f file An ldif file to be substituted for the LDAP server in association with 
+    --smartgen
+
+ --duration seconds Tell treadmill to exit after a set interval of activity. Zero
+   indicates no limit. 
+
+=head1 CONFIGURATION
+
+ There are four prioritized sources of configuration. Settings will be read from 
+ these sources in order with each successive source taking precedence. 
+
+ 1. threadmill.pl      - Hardcoded defaults. 
+ 2. treadmill.conf     - The main configuration file. 
+ 3. treadmill profiles - more specific configuration.
+ 4. Command line Opts  - The final authority.
+
+ * For more detailed configuration documentation see: TODO
+
+
+=cut
