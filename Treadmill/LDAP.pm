@@ -83,10 +83,10 @@ my %LDIF_Err_Msgs = (
 
 =cut
 
-=head LDAP_Connect
+=head2 LDAP_Connect
 
  Purpose: Initialize our LDAP connection. 
- Accepts: Server URI,, Bind DN, Bind Pass
+ Accepts: Server URI, Bind DN, Bind Pass
  Returns: An ldap connection object and a result code.
 
 =cut
@@ -150,7 +150,7 @@ sub LDAP_Close {
 
 =head2 LDAP_Fail_Msg
 
-Purpose: Create an informative and verbose  error message from an LDAP error code.
+ Purpose: Create an informative and verbose  error message from an LDAP error code.
  Accepts: LDAP error code
  Returns: Error string
 
@@ -164,7 +164,6 @@ sub LDAP_Fail_Msg {
 	my $str;
 	unless ($short) {
 		$str .= "The LDAP server returned an error:\n";
-		#$str	.= "Caller: " . caller() . "\n";
 		$str .= "Name: " . ldap_error_name($code) . "\n";
 	}
 
@@ -177,7 +176,7 @@ sub LDAP_Fail_Msg {
 
 =head2 LDAP_Get_Set
 
-Purpose: Get N Net::LDAP::Entry objects and return them in an array.
+ Purpose: Get <n> Net::LDAP::Entry objects and return them in an array.
  Accepts: Net::LDAP::Search object and a count.
  Returns: An array of references or undef if empty
 
@@ -203,7 +202,7 @@ sub LDAP_Get_Set {
 
 =head2 LDIF_Open
 
-Purpose: Open an ldif file and returnan ldif object. 
+ Purpose: Open an ldif file and returnan ldif object. 
  Accepts: The LDIF file location.
  Returns: An ldif object of undef & an error code.
 
@@ -226,7 +225,7 @@ sub LDIF_Open {
 
 =head2 LDIF_Get_Set 
 
- Purpose: Get N Net::LDAP::Entry objects and return them in an array.
+ Purpose: Get <n> Net::LDAP::Entry objects and return them in an array.
  Accepts: An LDIF object and a count.
  Returns: An array of references or undef if empty.
 
@@ -249,7 +248,6 @@ sub LDIF_Get_Set {
 			$err .= $ldif->error_lines ."\n\n";
 
 			return undef, $err;
-			#die("\n" . $ldif->error . "\nLines: " . $ldif->error_lines . "\n\n");
 		}
 
 		push(@arr, $entry_ref);
