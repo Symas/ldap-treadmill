@@ -57,9 +57,9 @@
 #
 
 my %profile = (
-	bind	=> 500,
-	add 	=> 250,
-	search	=> 500,
+	bind	=> 100,
+	add 	=> 100,
+	search	=> 100,
 );
 
 
