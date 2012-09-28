@@ -1,0 +1,31 @@
+Short and long term goals for the LDAP Treadmill. 
+
+General:
+- Add GUI
+- Destructive mods/deletes.
+- Proofread and complete perldoc.
+- Ability to give each thread it's own profile.
+- Save derived op sets or stats for a  faster init.
+- Option to control which op types are smartgened. 
+- More behaviors. Such as:
+  - 'bad behavior'
+  - open connection, bind, send op, drop.
+  - malformed filters
+  - unindexed searches (detection?)
+
+Code Improvement:
+- Figure out a more sensible constants and error handling scheme. 
+- Divide out smartgen code into threads with separate ldap connections. 
+  I.E. Searching for bind creds. 
+- Re-arrange functions to have a more logical grouping in file. 
+- Exclude objectClass from search attrs. (or not?)
+- Take a look at the input checking since args and settings have changed.
+- only try to delete existing DNs on cleanup.
+- Add infinite loop protection for Rand_Arr. See comments. 
+
+
+Needs Testing:
+- Stats LDIF and LDAP errors
+- App Doesn't err on non-existent LDIF file. 
+
+
