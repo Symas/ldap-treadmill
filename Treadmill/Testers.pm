@@ -61,7 +61,7 @@ our @EXPORT_OK	= qw( Binder Searcher Adder Modifier Deleter );
 sub Binder {
 	my ($ldap, $dn, $pw) =  @_;
 
-	#print "Binding as: \"$dn\" \"$pw\"";
+	#print "Binding as: \"$dn\" \"$pw\"\n";
 	
 	my $msg = $ldap->bind( $dn, password => $pw );
 	return $msg->code();
