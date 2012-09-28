@@ -59,9 +59,6 @@ treadmill.pl [-H ldapuri] [-D binddn] [-w passwd] [--help]
  1. threadmill.pl      - Hardcoded defaults. 
  2. treadmill.conf     - The main configuration file. 
  3. treadmill profiles - more specific configuration.
- 4. Command line Opts  - The final authority.
-
- * For more detailed configuration documentation see: TODO
-
+ 4. Command line opts  - The final authority.
 
 =cut
