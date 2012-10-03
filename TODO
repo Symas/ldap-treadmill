@@ -1,17 +1,20 @@
 Short and long term goals for the LDAP Treadmill. 
 
+URGENT:
+- None
+
 General:
-- Add GUI
 - Destructive mods/deletes.
 - Proofread and complete perldoc.
 - Ability to give each thread it's own profile.
-- Save derived op sets or stats for a  faster init.
+- Save derived op sets or stats for a faster init.
 - Option to control which op types are smartgened. 
 - More behaviors. Such as:
   - 'bad behavior'
   - open connection, bind, send op, drop.
   - malformed filters
   - unindexed searches (detection?)
+- Spell check profiles
 
 Code Improvement:
 - Figure out a more sensible constants and error handling scheme. 
@@ -21,7 +24,7 @@ Code Improvement:
 - Exclude objectClass from search attrs. (or not?)
 - Take a look at the input checking since args and settings have changed.
 - only try to delete existing DNs on cleanup.
-- Add infinite loop protection for Rand_Arr. See comments. 
+- Add infinite loop protection for Rand_Arr. See  code comments. 
 
 
 Needs Testing:

@@ -6,8 +6,8 @@ treadmill.pl - A LDAP server exercise machine
 
 treadmill.pl [-H ldapuri] [-D binddn] [-w passwd] [--help]
              [--threads num] [--config file] [--profile file]
-             [--smartgen ][-f file]
-             [--duration seconds]
+             [--smartgen ][-f file] [--duration seconds]
+             [--nostats]
   
  * Single letter options mirror those of ldapsearch.
 
@@ -50,6 +50,8 @@ treadmill.pl [-H ldapuri] [-D binddn] [-w passwd] [--help]
 
  --duration seconds Tell treadmill to exit after a set interval of activity. Zero
    indicates no limit. 
+ 
+ --nostats Disables operation rate listing.
 
 =head1 CONFIGURATION
 
