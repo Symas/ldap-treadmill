@@ -72,13 +72,16 @@ use Treadmill::LDAP		qw( LDAP_Connect LDAP_Close LDAP_Fail_Msg
 use Treadmill::Config	qw( Load_Config :CONST);
 use Treadmill::Testers	qw( Binder Searcher Adder Modifier Deleter );
 
+use POSIX;
+use Term::Cap;
+
 
 #############
 # Constants #
 #############
 
 # How many ldap operations happen between thread->yield calls.
-# NOTE: The time taken by each ldap op may be  *highly* variable. 
+# NOTE: The time taken by each ldap op may be *highly* variable. 
 use constant OP_BLOCK_SIZE	=> 10;
 
 # How many random characters to suffix new DNs with.
@@ -104,6 +107,11 @@ use constant STATS_MAX_CNT	=> 0;
 # The number of entries to pull before processing that group
 use constant STAT_SET_SIZE	=> 50;
 
+# The maximum number threads to display. 
+# NOTE: All cross-platform solutions for getting terminal height 
+# require extra modules from CPAN.
+use constant MAX_THR_ROWS	=> 35;
+
 
 
 #########
@@ -119,15 +127,17 @@ $| = 1;
 # Thread sharing #
 ##################
 
+# When all elements are set to 1 we're ready start!
+my @threads_ready :shared;
+
+# Threads will wait for this one after their initialization.  
+my $begin_threads :shared;
+
 # boolean to tell threads when it's time to clean up and shut down.
 my $exit_threads :shared = 0;
 
-
-##########
-# CTRL-C #
-##########
-
-$SIG{'INT'} = \&Abort;
+# Will hold an operation count for each thread. 
+my %op_cnts :shared;
 
 
 ############
@@ -151,9 +161,13 @@ my %options = (
 	randchars	=> ['a'..'j'], 
 
 	op_profile	=> {
-					bind	=> 20,
-					search	=> 20,
-					add		=> 10,
+					bind		=> 20,
+					search		=> 20,
+					add			=> 10,
+					},
+
+	op_args		=> {
+					add => {dn_class => 'cn',},			
 					},
 	
 	smartgen	=> {
@@ -161,7 +175,10 @@ my %options = (
 					searches	=> 1,
 					binds		=> 1,
 					},
+	
+	nostats		=> 0,
 	);
+
 
 # Fill in with key names that you wish to be required.
 # If they are given real default values above this will not key. 
@@ -186,9 +203,29 @@ my @hash_methods = qw( CRYPT MD5 SMD5 SSHA SHA );
 sub main {
 	my $thr_cnt;
 	my $thr_msg_ref;
-	my $dot_cnt;
 	my (@errs, $err);
 	
+	###################
+	# Set up Term Cap #
+	###################
+
+	my $termios = new POSIX::Termios;
+	$termios->getattr;
+	my $terminal = Tgetent Term::Cap { 
+			TERM => undef, 
+			OSPEED => $termios->getospeed };
+	$terminal->Trequire(qw( cl ce cm cd ti ));
+	# NOTE: Not sure why but we segfault if we wait for perl to destroy
+	# our termios object when the app quits. This line destroys it now. 
+	# Upon further toying -- It appears that launching threads instigates
+	# the issue...
+	$termios = undef;
+	
+	my $clear_line	= $terminal->Tputs('ce', 1, undef);
+	my $term_home	= $terminal->Tgoto('cm', 0, 0, undef);
+
+	print $terminal->Tputs('cl', 1, undef);
+
 	#######################
 	# Options and configs #
 	#######################
@@ -211,10 +248,18 @@ sub main {
 		exit(1);
 	}
 
+	########
+	# Misc #
+	########
+	my $status_height = 3;
+	$status_height += 3 if $options{duration};
 
-	##########################
-	# LDAP/LDIF Stat Threads #
-	##########################
+
+	###################
+	# LDAP/LDIF Stats #
+	###################
+
+	print "Initializing...\n";
 
 	my ($stats_ref);
 	if ($options{smartgen}{enabled}) {
@@ -240,26 +285,62 @@ sub main {
 
 	my ($i, $tmp_thr);
 	for ($i = 0; $i < $options{threads}; $i++ ) {
+		$threads_ready[$i] = 0;
 		$tmp_thr = threads->create('Start_Thread', \%options, $proto_args_ref);
 	}
+	
+	# Wait for all the threads to initialize. 
+	while(! $begin_threads) {
+		$begin_threads = 1 unless (map {$_ == 0 ? 1 : ()} @threads_ready);	
+		threads->yield();
+	}
 
-	print "Starting treadmill.\n";
-
+	
+	#Begin trapping CTRL-C now..
+	$SIG{'INT'} = \&Abort;
+	
+	print "Starting treadmill...\n";
+	
 	my $start = time();
+	my (@last_cnts);
+	my $status;
+	my ($time_spent, $time_left);
+	my $total_ops;
 	while (1) {	
-		
+		$time_spent = time() - $start;			
 		if ($options{duration} &&
-			time() - $start >= $options{duration}) {		
+			$time_spent >= $options{duration}) {		
 			$exit_threads = 1;
 		}
 
-		print '.' unless ($exit_threads);
-		print "\n" unless (++$dot_cnt % 60);
-
 		($thr_cnt, $thr_msg_ref) = &Check_Threads();	
 		last if (scalar(@{$thr_msg_ref}) || !$thr_cnt);
+		if (! $options{nostats}) {
+			$time_left = ($options{duration}-(time()-$start));
+			$time_left = 'Finishing...' if ($time_left <= 0);
+			$status  = $term_home; 
+			$status .= $clear_line . "Treadmill Running...\n";
+			$status .= $clear_line . "Time Left: " . $time_left  . "\n" if ($options{duration});
+			$status .= $clear_line . "\n";
+			$status .= $clear_line . "\t\tAvg. Ops/s:\tTotal Ops:\n";
+			$total_ops = 0;
+			for ($i=1; $i <= keys(%op_cnts) && $i <= MAX_THR_ROWS; $i++) {
+				$last_cnts[$i] = $op_cnts{$i};
+				
+				$status .= $clear_line . "Thread-$i\t"; 
+				$status .= int($op_cnts{$i}/($time_spent+.5)) . "\t\t" . $op_cnts{$i} . "\n";
+				$total_ops += $op_cnts{$i};
+			}
+			$status .= $clear_line . "\n";	
+			$status .= $clear_line . "All threads\t". int($total_ops/($time_spent+.5)) . "\t\t"  . $total_ops;
 	
+			print $status;
+	
+		} else {
+			print '.';
+		}
 		sleep(1);
+	
 	}
 
 	if (scalar(@{$thr_msg_ref})) {
@@ -272,7 +353,7 @@ sub main {
 		exit(1);
 	}
 
-	print "\nTest Completed.\n";
+	print "\n\nTest Completed.\n";
 	exit(0);
 }
 
@@ -300,17 +381,27 @@ sub Start_Thread {
 	# These are sort of pseudo-references. Perl copies the data for each thread. 
 	my %settings = %{+shift};
 	my %proto_args = %{+shift};
+	
+	my $thread_id = threads->tid();
 
 	my ($ldap, $err_msg) = LDAP_Connect($settings{URI}, $settings{binddn}, $settings{pass});
 	return ($err_msg) if (defined($err_msg));
 
 	my ($fun_refs, $arg_refs, $dns_ref) = Populate_Funs(\%settings, \%proto_args);
-	
+
+	# Signal readiness and hang out until the other threads are ready.
+	$threads_ready[$thread_id-1] = 1;
+	while (! $begin_threads){
+		threads->yield();
+	}
+
 	my ($i, $fun_ret);
 	my $cleanup_ret;
 	while (1) {
 		for($i=0; $i < scalar(@{$fun_refs}); $i++) {
-		
+			
+			$op_cnts{$thread_id}++;
+
 			$fun_ret = $fun_refs->[$i]->($ldap, @{$arg_refs->[$i]});
 
 			if ($fun_ret) {
@@ -418,6 +509,7 @@ sub Get_Shell_Opts {
 		'profile=s'		=> \$shell_opts{profile},
 		'duration=i'	=> \$shell_opts{duration},
 		'smartgen'		=> \$shell_opts{smartgen}{enabled},
+		'nostats'		=> \$shell_opts{nostats},
 		'help|?'		=> \$needs_help,
 		) or pod2usage(-input => './treadmill.pod');
 
@@ -462,9 +554,7 @@ sub Get_File_Opts {
 		return;
 	}
 
-	for (keys %{$config_ref}) {
-		$opts_ref->{$_} = $config_ref->{$_}
-	}
+	&Hash_Overlay($opts_ref, $config_ref);
 
 }
 
@@ -554,8 +644,8 @@ sub Populate_Funs {
 	my %settings	= %{+shift};
 	my %proto_args	= %{+shift};
 
-	# TODO: Make these two configurable. 
-	my $dn_attr		= 'cn';
+	# TODO: Make these two configurable. (one down...) 
+	my $dn_attr		= $settings{op_args}{add}{dn_class};
 	my @obj_class	= qw( top organizationalPerson );
 	
 	my $rebind = [$settings{binddn}, $settings{pass}];
@@ -598,7 +688,7 @@ sub Populate_Funs {
 		}	
 	}
 
-	
+
 	##################
 	# Combine it all #
 	##################
@@ -613,9 +703,7 @@ sub Populate_Funs {
 	
 	$i=0; 
 	while(1) {
-		
 		$op = $op_list[rand(@op_list)];
-		
 		if ($lastop eq 'bind' && $op ne 'bind') {
 
 			# Rebind as the privileged DN after one or more bind ops.
@@ -673,6 +761,7 @@ sub Populate_Funs {
 		threads->yield() unless ($i++ % OP_BLOCK_SIZE);
 	}
 
+	#DumpIt(\@all_args); exit(0);
 	return \@all_ops, \@all_args, \@dn_list;
 }
 
@@ -831,8 +920,12 @@ sub Get_Stats {
 sub Prep_Args {
 	my $opt_ref = shift;
 	my $stats_ref = shift;
-
+	my $dn_ojc = $opt_ref->{op_args}{add}{dn_class}; 
+	
 	my %proto_args;
+	
+	# drop any 0 op sets. 
+	map { delete($opt_ref->{op_profile}{$_}) unless $opt_ref->{op_profile}{$_}} keys(%{$opt_ref->{op_profile}});
 
 	# Search Args
 	if (exists($opt_ref->{op_profile}{search})) {
@@ -850,8 +943,8 @@ sub Prep_Args {
 			}
 
 		} else {
-			@search_vals = map {"($_*)"} @{$opt_ref->{randchars}};
-			push(@search_vals, '*');
+			@search_vals = map {"($dn_ojc=$_*)"} @{$opt_ref->{randchars}};
+			push(@search_vals, "($dn_ojc=*)");
 		}
 				
 		push(@search_vals, '(objectClass=*)');
@@ -892,7 +985,6 @@ sub Prep_Args {
 		$proto_args{add} = $tmp_adds_ref;
 	}
 	
-
 	return \%proto_args;
 }
 
@@ -966,7 +1058,6 @@ sub SysLogIt {
 	closelog();
 
 }
-
 
 
 
