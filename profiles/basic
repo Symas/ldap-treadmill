@@ -45,14 +45,14 @@
 #   defaults -> treadmill.conf -> profile -> command line.
 
 
-# Here you speficy the number of each operation type to run per thread per iteration.
+# Here you specify the number of each operation type to run per thread per iteration.
 # Each thread will generate a randomized list of these operations and cycle through it 
 # until an exit condition occurs.
 #
 # Note: 
-# * Each add will cause a coresponding delete(or two, see next line). 
+# * Each add will cause a corresponding delete(or two, see next line). 
 # * A cleanup is done when an exit condition occurs. This results in a delete operation
-#   for each add. Currently, this is done for all generated DNs reguardless of if they've 
+#   for each add. Currently, this is done for all generated DNs regardless of if they've 
 #   already been deleted that iteration. I'm planning to change this in the future. 
 #
 

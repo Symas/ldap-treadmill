@@ -58,6 +58,8 @@
 
 my %profile = (
 	search	=> 100,
+	add		=> 0,
+	bind	=> 0,
 );
 
 
