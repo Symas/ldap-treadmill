@@ -1,66 +1,75 @@
 =head1 NAME
 
-treadmill.pl - A LDAP server exercise machine
+treadmill.pl - A LDAP server exercise machine.
 
 =head1 SYNOPSIS
 
-treadmill.pl [-H ldapuri] [-D binddn] [-w passwd] [--help]
-             [--threads num] [--config file] [--profile file]
-             [--smartgen ][-f file] [--duration seconds]
-             [--nostats]
-  
- * Single letter options mirror those of ldapsearch.
+B<treadmill.pl> [B<-H> I<ldapuri>] [B<-D> I<binddn>] [B<-w> I<passwd>]
+[B<--threads> I<num>] [B<--config> I<file>] [B<--profile> I<file>] 
+[B<--smartgen>] [B<-f> I<file>] [B<--duration> I<seconds>] [B<--nostats>] [B<--help>]
+
+* Single letter options mirror those of ldapsearch.
 
 =head1 DESCRIPTION
 
- The LDAP Treadmill is a simple perl application that will run a defined set of 
- operations on a server for a interval or pending CTRL-C. 
- 
- One may also: 
-  - Specify multiple threads. One connection per thread.
-  - Specify additional operation sets and coresponding settings as profiles
-  - Automatically generate more pertinent operation parameters by examining the 
-    server or parsing an LDIF backup.
+The LDAP Treadmill is a simple perl application that will run a defined set of  operations against a server for an interval or pending CTRL-C. 
+
+The Treadmill defaults are tailored to the example database distributed with B<Symas OpenLDAP>. An LDIF dump of this database has been included with this utility. 
+
+Treadmill is I<not> a benchmarking application since Perl simply won't be able to keep up with OpenLDAP. The operations/second feedback is not indicative of OpenLDAP's true capabilities.
+
+=over
+
+=item One may also:
+
+=item - Specify custom operation sets and corresponding settings as profiles.
+
+=item - Specify multiple threads with one connection per thread. Each thread runs through the full set of defined operations. 
+
+=item - Automatically generate more pertinent operation parameters by examining the server or parsing an LDIF backup via the "B<--smartgen>" argument.
+
+=back
 
 =head1 OPTIONS
 
- -H ldapuri The LDAP server URI to connect to.
+B<-H> I<ldapuri> The LDAP server URI to connect to.
 
- -D binddn The DN used for server authentication.
+B<-D> I<binddn> The DN used for server authentication.
 
- -w passwd The password used for server authentication.
+B<-w> I<passwd> The password used for server authentication.
 
- --help Print out a brief usage statement.
+B<--threads> I<num> The number of threads to launch. Each thread generates a somewhat randomized set of operations which it loops until interrupted.
 
- --threads num The number of threads to launch. Each thread generates a
-   somewhat randomized set of operations which it loops until interrupted.
+B<--config> I<file> Allows one to specify an alternate configuration file.
 
- --config file Allows one to specify an alternate configuration file.
+B<--profile> I<file> Allows one to specify an alternate profile file.
 
- --profile file Allows one to specify an alternate profile file.
+B<--smartgen> Instructs treadmill to connect to LDAP and read a subset of entries  used to accumulate some statistics and information for more relevant operation generation. 
 
- --smartgen Instructs treadmill to connect to LDAP and read a subset of entries 
-   used to accumulate some statistics and information for more relevant operation 
-   generation. 
-
-   If -f is used an LDIF file may be substituted which is usually faster.
+If "B<-f>" is used an LDIF file may be substituted which is usually faster.
  
- -f file An ldif file to be substituted for the LDAP server in association with 
-    --smartgen
+B<-f> I<file> An LDIF file to be substituted for the LDAP server in association with "B<--smartgen>".
 
- --duration seconds Tell treadmill to exit after a set interval of activity. Zero
-   indicates no limit. 
+B<--duration> I<seconds> Tell treadmill to exit after a set interval of activity. Zero indicates no limit. 
  
- --nostats Disables operation rate listing.
+B<--nostats> Disables operation rate listing.
+
+B<--help> Print out a brief usage statement.
 
 =head1 CONFIGURATION
 
- There are four prioritized sources of configuration. Settings will be read from 
- these sources in order with each successive source taking precedence. 
+There are four prioritized sources of configuration. Settings will be read from these sources in order with each successive source taking precedence. 
 
- 1. threadmill.pl      - Hardcoded defaults. 
- 2. treadmill.conf     - The main configuration file. 
- 3. treadmill profiles - more specific configuration.
- 4. Command line opts  - The final authority.
+=over 
+
+=item 1. treadmill.pl       - Hardcoded defaults. 
+
+=item 2. treadmill.conf     - The main configuration file. 
+
+=item 3. treadmill profiles - more specific configuration.
+
+=item 4. Command line opts  - The final authority.
+
+=back
 
 =cut
