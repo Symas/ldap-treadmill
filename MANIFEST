@@ -1,4 +1,6 @@
 LICENSE
+MANIFEST
+README
 TODO
 Treadmill/Config.pm
 Treadmill/LDAP.pm
