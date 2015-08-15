@@ -112,7 +112,8 @@ use constant STAT_SET_SIZE	=> 50;
 # require extra modules from CPAN.
 use constant MAX_THR_ROWS	=> 35;
 
-
+# Ignore Operation Failures.
+use constant IGNORE_OP_FAIL	=> 1;
 
 #########
 # DEBUG #
@@ -404,7 +405,7 @@ sub Start_Thread {
 
 			$fun_ret = $fun_refs->[$i]->($ldap, @{$arg_refs->[$i]});
 
-			if ($fun_ret) {
+			if (! IGNORE_OP_FAIL && $fun_ret) {
 				$cleanup_ret = &Cleanup($ldap, \%settings, $dns_ref);
 				
 				return (LDAP_Fail_Msg($fun_ret), LDAP_Fail_Msg($cleanup_ret)) if ($cleanup_ret);
