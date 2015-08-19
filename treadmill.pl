@@ -61,7 +61,9 @@ use Net::LDAP;
 use Net::LDAP::LDIF;
 use Net::LDAP::Constant qw( LDAP_NO_SUCH_OBJECT LDAP_SIZELIMIT_EXCEEDED );
 
-use List::Util qw(shuffle);
+use Term::ReadKey qw( ReadMode ReadKey );
+use Time::HiRes qw( usleep );
+use List::Util qw( shuffle );
 
 use Pod::Usage;
 use Getopt::Long;
@@ -115,6 +117,9 @@ use constant MAX_THR_ROWS	=> 35;
 # Ignore Operation Failures.
 use constant IGNORE_OP_FAIL	=> 1;
 
+# How much to jump the throttle up/down(microseconds)?
+use constant THR_THROTTLE_JMP	=> 100 * 1000;
+
 #########
 # DEBUG #
 #########
@@ -123,6 +128,14 @@ use constant IGNORE_OP_FAIL	=> 1;
 # Useful for debugging thread loops. 
 $| = 1;
 
+########
+# Misc #
+########
+
+# Any extra mandatory cleanup.
+END {
+	ReadMode('restore');
+}
 
 ##################
 # Thread sharing #
@@ -139,6 +152,10 @@ my $exit_threads :shared = 0;
 
 # Will hold an operation count for each thread. 
 my %op_cnts :shared;
+
+# shared variable for syncing throttle vals.
+# TODO: There shoud be a shared hash and/or a shared array for all thread syncing.
+my $thr_throttle :shared = 0;
 
 
 ############
@@ -157,6 +174,8 @@ my %options = (
 	profile		=> './profiles/basic',
 	
 	threads		=> 4,
+	thr_throttle=> 0, # microseconds
+
 	duration	=> 0,
 
 	randchars	=> ['a'..'j'], 
@@ -183,11 +202,19 @@ my %options = (
 
 # Fill in with key names that you wish to be required.
 # If they are given real default values above this will not key. 
-my @required_opts = qw( URI basedn threads randchars op_profile );
+my @required_opts = qw( URI basedn threads thr_throttle randchars op_profile );
 
 # List of hash methods supported by OpenLDAP.
 # NOTE: Due to non-specific documentation these will be tested as case insensitive.
 my @hash_methods = qw( CRYPT MD5 SMD5 SSHA SHA );
+
+my %keys = (
+	quit				=> 'q',
+	thr_throttle_tog	=> 'p',
+	thr_throttle_up		=> 'a',
+	thr_throttle_down	=> 'z',
+);
+
 
 
 #############
@@ -221,8 +248,8 @@ sub main {
 	# Upon further toying -- It appears that launching threads instigates
 	# the issue...
 	$termios = undef;
-	
-	my $clear_line	= $terminal->Tputs('ce', 1, undef);
+
+my $clear_line	= $terminal->Tputs('ce', 1, undef);
 	my $term_home	= $terminal->Tgoto('cm', 0, 0, undef);
 
 	print $terminal->Tputs('cl', 1, undef);
@@ -254,7 +281,7 @@ sub main {
 	########
 	my $status_height = 3;
 	$status_height += 3 if $options{duration};
-
+	$thr_throttle = $options{thr_throttle} * 1000;
 
 	###################
 	# LDAP/LDIF Stats #
@@ -297,9 +324,12 @@ sub main {
 	}
 
 	
-	#Begin trapping CTRL-C now..
+	# Begin trapping CTRL-C now..
 	$SIG{'INT'} = \&Abort;
-	
+
+	# Set up key reading
+	ReadMode('cbreak');
+
 	print "Starting treadmill...\n";
 	
 	my $start = time();
@@ -307,11 +337,32 @@ sub main {
 	my $status;
 	my ($time_spent, $time_left);
 	my $total_ops;
+	my $throttle_store = undef;
+	my $key = 0;
 	while (1) {	
 		$time_spent = time() - $start;			
 		if ($options{duration} &&
 			$time_spent >= $options{duration}) {		
 			$exit_threads = 1;
+		}
+
+		# Handle key input
+		$key = ReadKey(-1);
+		if($key){
+			if ($key eq $keys{thr_throttle_up}) {
+				$thr_throttle += THR_THROTTLE_JMP;
+			} elsif ($key eq $keys{thr_throttle_down}) {
+				$thr_throttle -= THR_THROTTLE_JMP unless($thr_throttle == 0);
+			} elsif ($key eq $keys{thr_throttle_tog}) {
+				if (defined($throttle_store)){
+					($thr_throttle, $throttle_store) = ($throttle_store, undef);
+				} else {
+					($thr_throttle, $throttle_store) = (0, $thr_throttle);
+				}
+			} elsif ($key eq $keys{quit}) {
+				&Abort();
+			}
+			while (defined(ReadKey(-1))) {}; # Flush buffer
 		}
 
 		($thr_cnt, $thr_msg_ref) = &Check_Threads();	
@@ -322,6 +373,12 @@ sub main {
 			$status  = $term_home; 
 			$status .= $clear_line . "Treadmill Running...\n";
 			$status .= $clear_line . "Time Left: " . $time_left  . "\n" if ($options{duration});
+			$status .= $clear_line . "Thread Pacing: " . ($thr_throttle ? $thr_throttle/1000 . "ms" : "Disabled" ) . "\n";
+			$status .= $clear_line . "Keys:"
+									." [Pace: $keys{thr_throttle_tog}|$keys{thr_throttle_up}|$keys{thr_throttle_down}]"
+									." [Quit: $keys{quit}]"
+									."\n";
+			
 			$status .= $clear_line . "\n";
 			$status .= $clear_line . "\t\tAvg. Ops/s:\tTotal Ops:\n";
 			$total_ops = 0;
@@ -340,7 +397,7 @@ sub main {
 		} else {
 			print '.';
 		}
-		sleep(1);
+		usleep(200_000); # 200ms
 	
 	}
 
@@ -382,7 +439,7 @@ sub Start_Thread {
 	# These are sort of pseudo-references. Perl copies the data for each thread. 
 	my %settings = %{+shift};
 	my %proto_args = %{+shift};
-	
+
 	my $thread_id = threads->tid();
 
 	my ($ldap, $err_msg) = LDAP_Connect($settings{URI}, $settings{binddn}, $settings{pass});
@@ -416,8 +473,9 @@ sub Start_Thread {
 				return LDAP_Fail_Msg($cleanup_ret) if ($cleanup_ret);
 				return 0;
 			}
-
+			
 			threads->yield() unless ($i % OP_BLOCK_SIZE);
+			usleep($thr_throttle);
 		}
 	}
 }
@@ -480,7 +538,7 @@ sub Join_Threads {
 
 #NOTE: Why not call Join_Threads? 
 sub Abort {
-	print "\nCaught CTRL-C. Performing Cleanup.\n";
+	print "\nAsked to quit. Performing Cleanup.\n";
 	$exit_threads = 1;
 }
 
@@ -500,6 +558,7 @@ sub Get_Shell_Opts {
 	
 	Getopt::Long::Configure( qw( no_auto_abbrev no_ignore_case ) );
 
+	#TODO: Move to config section at beginning of file.
 	GetOptions(
 		'H=s'			=> \$shell_opts{URI},
 		'D=s'			=> \$shell_opts{binddn},
@@ -509,6 +568,7 @@ sub Get_Shell_Opts {
 		'config=s'		=> \$shell_opts{conffile},
 		'profile=s'		=> \$shell_opts{profile},
 		'duration=i'	=> \$shell_opts{duration},
+		'throttle=i'	=> \$shell_opts{thr_throttle},
 		'smartgen'		=> \$shell_opts{smartgen}{enabled},
 		'nostats'		=> \$shell_opts{nostats},
 		'help|?'		=> \$needs_help,

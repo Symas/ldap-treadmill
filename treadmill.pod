@@ -5,8 +5,9 @@ treadmill.pl - A LDAP server exercise machine.
 =head1 SYNOPSIS
 
 B<treadmill.pl> [B<-H> I<ldapuri>] [B<-D> I<binddn>] [B<-w> I<passwd>]
-[B<--threads> I<num>] [B<--config> I<file>] [B<--profile> I<file>] 
-[B<--smartgen>] [B<-f> I<file>] [B<--duration> I<seconds>] [B<--nostats>] [B<--help>]
+[B<--threads> I<num>] [B<--config> I<file>] [B<--profile> I<file>] [B<--smartgen>] 
+[B<--throttle> I<milliseconds>] [B<-f> I<file>] [B<--duration> I<seconds>] 
+[B<--nostats>] [B<--help>]
 
 * Single letter options mirror those of ldapsearch.
 
@@ -17,6 +18,13 @@ The LDAP Treadmill is a simple perl application that will run a defined set of  
 The Treadmill defaults are tailored to the example database distributed with B<Symas OpenLDAP>. An LDIF dump of this database has been included with this utility. 
 
 Treadmill is I<not> a benchmarking application since Perl simply won't be able to keep up with OpenLDAP. The operations/second feedback is not indicative of OpenLDAP's true capabilities.
+
+Required non-core Modules:
+Net::LDAP
+Net::LDAP::LDIF
+Net::LDAP::Constant
+Term::ReadKey
+
 
 =over
 
@@ -45,6 +53,8 @@ B<--config> I<file> Allows one to specify an alternate configuration file.
 B<--profile> I<file> Allows one to specify an alternate profile file.
 
 B<--smartgen> Instructs treadmill to connect to LDAP and read a subset of entries  used to accumulate some statistics and information for more relevant operation generation. 
+
+B<--throttle> I<milliseconds> Thread level throttle value in milliseconds.
 
 If "B<-f>" is used an LDIF file may be substituted which is usually faster.
  
